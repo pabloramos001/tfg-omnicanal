@@ -177,7 +177,7 @@ function buildInitialMessages(conversation: ReservationAgentConversation): Agent
 }
 
 export function AgentChat({ initialConversations }: AgentChatProps) {
-  const [selectedConversationId, setSelectedConversationId] = useState(initialConversations[0]?.id ?? "new");
+  const [selectedConversationId] = useState("new");
   const [draft, setDraft] = useState("");
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, AgentChatMessage[]>>(() =>
     Object.fromEntries(initialConversations.map((conversation) => [conversation.id, buildInitialMessages(conversation)])),
@@ -265,81 +265,16 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.3fr]">
-      <aside className="rounded-[1.75rem] border border-stone-200 bg-stone-50/85 p-5 shadow-[0_8px_24px_rgba(87,83,78,0.06)]">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-[#355986]/70">Conversaciones</p>
-            <h2 className="mt-2 text-2xl font-semibold">Inbox del agente</h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedConversationId("new");
-              setLastResponse(null);
-            }}
-            className="rounded-full bg-stone-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-stone-50"
-          >
-            Nueva
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {initialConversations.map((conversation) => {
-            const isSelected = conversation.id === selectedConversationId;
-
-            return (
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => {
-                  setSelectedConversationId(conversation.id);
-                  setLastResponse(null);
-                }}
-                className={`w-full rounded-[1.25rem] border p-4 text-left transition ${
-                  isSelected
-                    ? "border-[#446fa6] bg-[#5d88c4] text-[#f6f9fe]"
-                    : "border-stone-200 bg-white text-stone-900"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className={`text-xs uppercase tracking-[0.2em] ${isSelected ? "text-[#dce9f8]" : "text-stone-500"}`}>
-                      {conversation.canal}
-                    </p>
-                    <h3 className="mt-2 text-lg font-semibold">{conversation.cliente}</h3>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                      isSelected ? "bg-white/12 text-[#eef4fb]" : "bg-stone-100 text-stone-700"
-                    }`}
-                  >
-                    {conversation.intencion}
-                  </span>
-                </div>
-                <p className={`mt-3 text-sm leading-6 ${isSelected ? "text-[#eef4fb]" : "text-stone-600"}`}>
-                  {conversation.ultimaPregunta}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
-
-      <section className="rounded-[1.75rem] border border-stone-200 bg-white/85 p-5 shadow-[0_8px_24px_rgba(87,83,78,0.06)]">
+    <section className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-5 shadow-[0_8px_24px_rgba(87,83,78,0.06)] sm:p-6 lg:p-8">
         <div className="flex flex-col gap-3 border-b border-stone-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-[#355986]/70">Chat funcional</p>
-            <h2 className="mt-2 text-2xl font-semibold">
-              {selectedConversation ? selectedConversation.cliente : "Nueva conversacion con el agente"}
-            </h2>
+            <p className="text-sm uppercase tracking-[0.25em] text-[#355986]/70">Chat del agente</p>
+            <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Conversacion directa con el asistente</h1>
           </div>
-          <div className="rounded-2xl bg-stone-950 px-4 py-3 text-sm text-stone-100">
-            {selectedConversation ? selectedConversation.estado : "listo para recibir consultas"}
-          </div>
+          <div className="rounded-2xl bg-stone-950 px-4 py-3 text-sm text-stone-100">listo para recibir consultas</div>
         </div>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-6 flex min-h-[420px] flex-col gap-3 rounded-[1.5rem] bg-stone-50 p-4 sm:p-5">
           {selectedMessages.map((message, index) => (
             <article
               key={`${message.role}-${index}`}
@@ -354,9 +289,50 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
           ))}
         </div>
 
-        <div className="mt-5 rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
+        {lastResponse?.actionButtons.length ? (
+          <div className="mt-5 rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Acciones del agente</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {lastResponse.actionButtons.map((action) => (
+                action.kind === "link" && action.href ? (
+                  <a
+                    key={action.id}
+                    href={action.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`transition ${
+                      isPrimaryReservationAction(action)
+                        ? "rounded-full border border-[#2f66b1] bg-[#2f66b1] px-5 py-3 text-sm font-semibold text-white no-underline shadow-[0_12px_28px_rgba(47,102,177,0.28)] visited:text-white hover:bg-[#24548f] hover:text-white"
+                        : "rounded-full border border-[#446fa6] bg-[#eef4fb] px-3 py-2 text-xs font-medium text-[#355986] hover:bg-[#dce9f8]"
+                    }`}
+                  >
+                    {action.label}
+                  </a>
+                ) : (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => sendMessage(action.message, buildContextFromResponse(lastResponse))}
+                    disabled={isSending}
+                    className={`rounded-full border px-3 py-2 text-xs font-medium transition disabled:opacity-60 ${
+                      action.kind === "escalation"
+                        ? "border-stone-900 bg-stone-900 text-stone-50 hover:bg-stone-800"
+                        : action.kind === "follow-up"
+                          ? "border-[#446fa6] bg-[#5d88c4] text-[#f6f9fe] hover:bg-[#507ab4]"
+                          : "border-stone-300 bg-stone-50 text-stone-700 hover:border-[#5d88c4] hover:text-[#355986]"
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                )
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-5 rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4 sm:p-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Acciones rapidas</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Mensajes de ejemplo</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {quickActions.map((action) => (
                 <button
@@ -369,52 +345,10 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
                   {action.label}
                 </button>
               ))}
-              {selectedReservation ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    sendMessage(
-                      `Quiero confirmar la ${selectedReservation.actividad} del ${selectedReservation.fecha} a las ${selectedReservation.hora}`,
-                    )
-                  }
-                  disabled={isSending}
-                  className="rounded-full border border-[#446fa6] bg-[#5d88c4] px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f6f9fe] disabled:opacity-60"
-                >
-                  Confirmar gestion actual
-                </button>
-              ) : null}
             </div>
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Rutas guiadas</p>
-              <p className="text-xs text-stone-500">Cada bloque abre una rama concreta del chatbot</p>
-            </div>
-            <div className="mt-3 grid gap-3 lg:grid-cols-2">
-              {guidedFlows.map((flow) => (
-                <article key={flow.title} className="rounded-[1.25rem] border border-stone-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-stone-900">{flow.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">{flow.description}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {flow.actions.map((action) => (
-                      <button
-                        key={action.label}
-                        type="button"
-                        onClick={() => sendMessage(action.message)}
-                        disabled={isSending}
-                        className="rounded-full border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-medium text-stone-700 transition hover:border-[#5d88c4] hover:text-[#355986] disabled:opacity-60"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <label htmlFor="agent-message" className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+          <label htmlFor="agent-message" className="mt-6 block text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
             Escribe al agente
           </label>
           <textarea
@@ -428,7 +362,7 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-stone-600">
-              El mock clasifica la intencion y responde con acciones de reserva, cambios, cobro o informacion.
+              El agente responde en la misma conversacion y propone el siguiente paso cuando hace falta.
             </p>
             <button
               type="button"
@@ -440,82 +374,6 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
             </button>
           </div>
         </div>
-
-        {lastResponse ? (
-          <div className="mt-5 grid gap-4 rounded-[1.5rem] border border-dashed border-stone-300 bg-white p-4 lg:grid-cols-[0.72fr_1.28fr]">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Clasificacion</p>
-              <p className="mt-2 text-xl font-semibold text-stone-900">{lastResponse.intent}</p>
-              <p className="mt-2 text-sm text-stone-600">Rama activa: {formatBranchLabel(lastResponse.branch)}</p>
-              <p className="mt-2 text-sm text-stone-600">Estado sugerido: {lastResponse.status}</p>
-              <p className="mt-2 text-sm text-stone-600">Confianza: {lastResponse.confidence}</p>
-
-              {lastResponse.missingFields.length > 0 ? (
-                <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-sm text-stone-700">
-                  <p className="font-semibold text-stone-900">Datos pendientes</p>
-                  <p className="mt-1">{lastResponse.missingFields.join(", ")}</p>
-                </div>
-              ) : null}
-
-              {formatDetectedData(lastResponse.detectedData).length > 0 ? (
-                <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-sm text-stone-700">
-                  <p className="font-semibold text-stone-900">Datos detectados</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {formatDetectedData(lastResponse.detectedData, lastResponse.language).map((item) => (
-                      <span key={item} className="rounded-full bg-[#5d88c4]/12 px-3 py-1 text-xs font-medium text-[#355986]">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Acciones de esta rama</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {lastResponse.actionButtons.map((action) => (
-                  action.kind === "link" && action.href ? (
-                    <a
-                      key={action.id}
-                      href={action.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`transition ${
-                        isPrimaryReservationAction(action)
-                          ? "rounded-full border border-[#2f66b1] bg-[#2f66b1] px-5 py-3 text-sm font-semibold text-white no-underline shadow-[0_12px_28px_rgba(47,102,177,0.28)] visited:text-white hover:bg-[#24548f] hover:text-white"
-                          : "rounded-full border border-[#446fa6] bg-[#eef4fb] px-3 py-2 text-xs font-medium text-[#355986] hover:bg-[#dce9f8]"
-                      }`}
-                    >
-                      {action.label}
-                    </a>
-                  ) : (
-                    <button
-                      key={action.id}
-                      type="button"
-                      onClick={() => sendMessage(action.message, buildContextFromResponse(lastResponse))}
-                      disabled={isSending}
-                      className={`rounded-full border px-3 py-2 text-xs font-medium transition disabled:opacity-60 ${
-                        action.kind === "escalation"
-                          ? "border-stone-900 bg-stone-900 text-stone-50 hover:bg-stone-800"
-                          : action.kind === "follow-up"
-                            ? "border-[#446fa6] bg-[#5d88c4] text-[#f6f9fe] hover:bg-[#507ab4]"
-                            : "border-stone-300 bg-stone-50 text-stone-700 hover:border-[#5d88c4] hover:text-[#355986]"
-                      }`}
-                    >
-                      {action.label}
-                    </button>
-                  )
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-sm text-stone-700">
-                <p className="font-semibold text-stone-900">Resumen del agente</p>
-                <p className="mt-1">{lastResponse.suggestedActions.join(" · ")}</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </section>
-    </div>
+    </section>
   );
 }

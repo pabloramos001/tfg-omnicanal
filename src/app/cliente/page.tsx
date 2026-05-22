@@ -92,10 +92,10 @@ export default function ClientePage() {
                 Chat integrado abajo a la izquierda
               </span>
               <Link
-                href="/"
+                href="/agent"
                 className="inline-flex rounded-full border border-stone-300 bg-white px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-stone-700 transition hover:border-[#5d88c4] hover:text-[#355986]"
               >
-                Volver a la demo interna
+                Abrir chat interno
               </Link>
             </div>
           </div>

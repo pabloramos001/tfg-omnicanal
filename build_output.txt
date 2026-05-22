@@ -1,0 +1,24 @@
+
+> tfg-demo-omnicanal@0.1.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/page.tsx:9:14
+Unterminated regexp literal
+  [90m 7 |[0m                 ))}
+  [90m 8 |[0m               </div>
+[31m[1m>[0m [90m 9 |[0m             </article>
+  [90m   |[0m              [31m[1m^^^^^^^^^[0m
+  [90m10 |[0m
+  [90m11 |[0m             <div className=[32m"grid gap-4"[0m>
+  [90m12 |[0m               {reservationAgentConversations.map((conversation) => (
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (./src/app/page.tsx:9:14)
