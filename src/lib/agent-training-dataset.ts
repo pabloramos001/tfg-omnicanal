@@ -1,0 +1,333 @@
+import type { AgentBranch, AgentConversationContext, AgentDetectedData, AgentIntent, AgentReply } from "@/lib/agent";
+
+export type AgentTrainingExample = {
+  id: string;
+  title: string;
+  intent: AgentIntent;
+  branch: AgentBranch;
+  context?: AgentConversationContext;
+  userMessage: string;
+  expectedStatus: AgentReply["status"];
+  expectedDetectedData: Partial<AgentDetectedData>;
+  knowledgeFacts: string[];
+  expectedBehavior: string[];
+};
+
+export const agentTrainingDataset: AgentTrainingExample[] = [
+  {
+    id: "reservation-default-activity-01",
+    title: "Reserva sin actividad explicita",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Quiero reservar este viernes a las 19:30",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "19:30",
+    },
+    knowledgeFacts: ["En una reserva del club, la actividad por defecto es pista."],
+    expectedBehavior: ["No pedir actividad", "Tratar la solicitud como una reserva ya entendida"],
+  },
+  {
+    id: "reservation-availability-01",
+    title: "Consulta de huecos reales",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Que huecos hay este viernes por la tarde",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+    },
+    knowledgeFacts: ["Si el usuario pide huecos, el agente debe consultar Playtomic y responder con horas libres reales."],
+    expectedBehavior: ["Clasificar la consulta como reserva", "Decir horas libres en vez de responder con informacion general"],
+  },
+  {
+    id: "reservation-no-player-count-01",
+    title: "Reserva sin indicar jugadores",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Quiero reservar una pista este viernes a las 19:30",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "19:30",
+    },
+    knowledgeFacts: ["Todas las pistas son dobles.", "No hay que pedir jugadores si no se han mencionado."],
+    expectedBehavior: ["No pedir el numero de jugadores", "Poder generar el enlace de Playtomic igualmente"],
+  },
+  {
+    id: "reservation-natural-time-01",
+    title: "Reserva con hora en lenguaje natural",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Quiero reservar una pista este viernes a las siete para 4 jugadores",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "19:00",
+    },
+    knowledgeFacts: ["El bot debe reconocer horas escritas con palabras."],
+    expectedBehavior: ["Descartar horas de madrugada fuera del horario operativo", "Resolver a 19:00 sin pedir confirmacion"],
+  },
+  {
+    id: "reservation-english-booking-01",
+    title: "Reserva en ingles con tomorrow y pm",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "I want to book a court tomorrow at 7:30 pm",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "manana",
+      hora: "19:30",
+    },
+    knowledgeFacts: ["El bot debe entender peticiones de reserva comunes tambien en ingles."],
+    expectedBehavior: ["Clasificar como reserva", "Entender tomorrow como mañana y pm como horario de tarde"],
+  },
+  {
+    id: "reservation-english-bare-hour-01",
+    title: "Reserva en ingles con hora numerica sin pm",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "I want to book a court at 6",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      hora: "18:00",
+    },
+    knowledgeFacts: ["El bot debe entender horas numericas sueltas como 'at 6'."],
+    expectedBehavior: ["Entender la hora numerica", "Resolver 6 a 18:00 porque 06:00 queda fuera del horario del club"],
+  },
+  {
+    id: "reservation-english-availability-01",
+    title: "Consulta de disponibilidad en ingles",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "What availability is there tomorrow afternoon?",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "manana",
+    },
+    knowledgeFacts: ["Las consultas de disponibilidad en ingles deben seguir entrando por reserva."],
+    expectedBehavior: ["Detectar disponibilidad", "No caer en informacion general"],
+  },
+  {
+    id: "reservation-indoor-01",
+    title: "Reserva de pista indoor no soportada",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Busco pista indoor este viernes a las 19:30 para 4 jugadores",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "19:30",
+      jugadores: 4,
+    },
+    knowledgeFacts: ["El club no tiene pistas indoor.", "Debe ofrecer pista exterior como alternativa."],
+    expectedBehavior: ["Aclarar la restriccion", "Reconducir sin perder fecha ni hora"],
+  },
+  {
+    id: "reservation-confirmation-01",
+    title: "Confirmacion de reserva bien definida",
+    intent: "reserva",
+    branch: "confirmacion-reserva",
+    userMessage: "Quiero confirmar la reserva del viernes a las 19:30 para 4 jugadores",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      fecha: "viernes",
+      hora: "19:30",
+      jugadores: 4,
+    },
+    knowledgeFacts: ["Debe poder pasar a cobro o bloqueo de franja."],
+    expectedBehavior: ["No pedir datos redundantes", "Proponer cierre o pago"],
+  },
+  {
+    id: "reservation-context-yes-01",
+    title: "Confirmacion breve con contexto",
+    intent: "reserva",
+    branch: "confirmacion-reserva",
+    context: {
+      intent: "reserva",
+      branch: "disponibilidad",
+      status: "en-curso",
+      detectedData: {
+        actividad: "Pista",
+        fecha: "viernes",
+        hora: "16:00",
+      },
+    },
+    userMessage: "Si",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "16:00",
+    },
+    knowledgeFacts: ["Una afirmacion breve debe ejecutar el siguiente paso cuando la reserva ya esta completa."],
+    expectedBehavior: ["Pasar de disponibilidad a confirmacion-reserva", "No repetir la respuesta anterior sin avanzar"],
+  },
+  {
+    id: "reservation-context-selection-01",
+    title: "Seleccion escrita en texto libre",
+    intent: "reserva",
+    branch: "confirmacion-reserva",
+    context: {
+      intent: "reserva",
+      branch: "disponibilidad",
+      status: "en-curso",
+      detectedData: {
+        actividad: "Pista",
+        fecha: "viernes",
+        hora: "19:30",
+      },
+    },
+    userMessage: "Esa me va bien",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Pista",
+      fecha: "viernes",
+      hora: "19:30",
+    },
+    knowledgeFacts: ["Una confirmacion escrita en lenguaje natural debe valer igual que pulsar el boton."],
+    expectedBehavior: ["Pasar a confirmacion-reserva", "Responder al texto libre igual que a los botones de accion"],
+  },
+  {
+    id: "class-change-01",
+    title: "Cambio de clase con origen y destino claros",
+    intent: "cambio-clase",
+    branch: "cambio-horario",
+    userMessage: "Necesito cambiar una clase del sabado al domingo por la manana",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Clase",
+      franjaActual: "sabado",
+      nuevaFranja: "domingo por la manana",
+      fecha: "domingo",
+    },
+    knowledgeFacts: ["Debe distinguir entre clase actual y nueva franja."],
+    expectedBehavior: ["No degradar el destino a solo manana", "Ofrecer confirmar o escalar"],
+  },
+  {
+    id: "class-recovery-01",
+    title: "Recuperacion de clase",
+    intent: "cambio-clase",
+    branch: "recuperacion-clase",
+    userMessage: "No puedo venir y quiero recuperar la clase la semana que viene",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      actividad: "Clase",
+    },
+    knowledgeFacts: ["Debe entrar en recuperacion-clase cuando el usuario dice recuperar o compensar."],
+    expectedBehavior: ["Preguntar si quiere otra sesion o compensacion", "Mantener la rama correcta"],
+  },
+  {
+    id: "billing-invoice-01",
+    title: "Factura de ultima reserva",
+    intent: "cobro",
+    branch: "factura",
+    userMessage: "Quiero la factura de mi ultima reserva",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      asuntoCobro: "factura",
+    },
+    knowledgeFacts: ["La factura requiere datos fiscales y referencia de reserva o bono."],
+    expectedBehavior: ["Pedir datos fiscales o confirmar la reserva", "No desviarse a reserva"],
+  },
+  {
+    id: "billing-charge-01",
+    title: "Revision de cobro",
+    intent: "cobro",
+    branch: "revision-cobro",
+    userMessage: "Necesito revisar un cobro duplicado de ayer",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      asuntoCobro: "revision de cobro",
+    },
+    knowledgeFacts: ["Debe tratar cobros y cargos como revision economica."],
+    expectedBehavior: ["Derivar a admin si hace falta", "Mantener la rama de cobro"],
+  },
+  {
+    id: "info-bonos-01",
+    title: "Informacion sobre bonos",
+    intent: "informacion",
+    branch: "bonos",
+    userMessage: "Quiero informacion sobre bonos y precios",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      temaInformativo: "bonos",
+    },
+    knowledgeFacts: ["Debe poder devolver comparativas y orientar segun caso de uso."],
+    expectedBehavior: ["Mantenerse en informacion", "Ofrecer botones de bonos"],
+  },
+  {
+    id: "info-tournaments-01",
+    title: "Informacion sobre ranking y torneos",
+    intent: "informacion",
+    branch: "torneos",
+    userMessage: "Quiero saber si hay ranking y proximos torneos",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      temaInformativo: "torneos",
+    },
+    knowledgeFacts: ["Debe agrupar ranking y torneos dentro de la misma rama."],
+    expectedBehavior: ["Ofrecer proximos torneos o segun nivel"],
+  },
+  {
+    id: "mixed-billing-priority-01",
+    title: "Cobro prevalece sobre reserva",
+    intent: "cobro",
+    branch: "factura",
+    userMessage: "Quiero la factura de la reserva que hice ayer",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      asuntoCobro: "factura",
+    },
+    knowledgeFacts: ["Si hay factura o cobro, la intencion debe ser cobro aunque aparezca reserva."],
+    expectedBehavior: ["No volver a reserva", "Pedir la informacion economica adecuada"],
+  },
+  {
+    id: "reservation-afternoon-01",
+    title: "Hora ambigua con franja de tarde",
+    intent: "reserva",
+    branch: "disponibilidad",
+    userMessage: "Quiero reservar este viernes a las siete por la tarde para 4 jugadores",
+    expectedStatus: "en-curso",
+    expectedDetectedData: {
+      fecha: "viernes",
+      hora: "19:00",
+      jugadores: 4,
+    },
+    knowledgeFacts: ["Si aparece por la tarde, la hora textual debe resolverse en 24h."],
+    expectedBehavior: ["Detectar 19:00", "No pedir la hora"],
+  },
+  {
+    id: "class-escalation-01",
+    title: "Cambio de clase con aviso a responsable",
+    intent: "cambio-clase",
+    branch: "cambio-horario",
+    userMessage: "Cambia mi clase del jueves a otro grupo y avisa al responsable",
+    expectedStatus: "esperando-cliente",
+    expectedDetectedData: {
+      actividad: "Clase",
+      franjaActual: "jueves",
+    },
+    knowledgeFacts: ["Debe recoger la clase actual y preparar la escalacion si falta nueva franja."],
+    expectedBehavior: ["No cerrar el caso sin nueva franja", "Pedir el dato que falta"],
+  },
+];
+
+export const agentTrainingDatasetSummary = {
+  totalExamples: agentTrainingDataset.length,
+  byIntent: {
+    reserva: agentTrainingDataset.filter((example) => example.intent === "reserva").length,
+    "cambio-clase": agentTrainingDataset.filter((example) => example.intent === "cambio-clase").length,
+    cobro: agentTrainingDataset.filter((example) => example.intent === "cobro").length,
+    informacion: agentTrainingDataset.filter((example) => example.intent === "informacion").length,
+  },
+};
