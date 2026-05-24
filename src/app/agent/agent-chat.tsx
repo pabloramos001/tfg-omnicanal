@@ -235,6 +235,7 @@ export function AgentChat({ initialConversations }: AgentChatProps) {
         [conversationKey]: [...(currentMessages[conversationKey] ?? []), { role: "assistant", content: data.reply }],
       }));
     } catch {
+      //comentario
       setMessagesByConversation((currentMessages) => ({
         ...currentMessages,
         [conversationKey]: [
