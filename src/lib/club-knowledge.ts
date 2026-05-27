@@ -260,6 +260,13 @@ type PlaytomicAvailabilityResource = {
   slots: PlaytomicAvailabilitySlot[];
 };
 
+export type PlaytomicDailyAvailabilitySlot = {
+  time: string;
+  availableCourts: number;
+  duration: number;
+  reserveUrl: string;
+};
+
 function buildPlaytomicClubLink(options: PlaytomicReservationLinkOptions, resolvedDate: string) {
   const params = new URLSearchParams({
     date: resolvedDate,
@@ -271,6 +278,18 @@ function buildPlaytomicClubLink(options: PlaytomicReservationLinkOptions, resolv
   });
 
   return `${clubKnowledge.reservations.playtomic.baseUrl}/${clubKnowledge.reservations.playtomic.clubPath}?${params.toString()}`;
+}
+
+function buildPlaytomicPaymentLink(resourceId: string, startDate: string, slot: PlaytomicAvailabilitySlot) {
+  const paymentParams = new URLSearchParams({
+    type: "CUSTOMER_MATCH",
+    tenant_id: clubKnowledge.reservations.playtomic.tenantId,
+    resource_id: resourceId,
+    start: formatUtcIsoWithoutMilliseconds(new Date(`${startDate}T${slot.start_time}Z`)),
+    duration: String(slot.duration),
+  });
+
+  return `${clubKnowledge.reservations.playtomic.baseUrl}/api/web-app/payments?${paymentParams.toString()}`;
 }
 
 function formatUtcIsoWithoutMilliseconds(value: Date) {
@@ -286,11 +305,14 @@ function getLocalTimeLabelFromUtc(date: string, utcTime: string, timeZone: strin
   }).format(new Date(`${date}T${utcTime}Z`));
 }
 
-async function getPlaytomicUniqueTimes(date: string) {
+async function fetchPlaytomicAvailabilityForDate(date: string) {
   const resolvedDate = resolveReservationDate(date);
 
   if (!resolvedDate) {
-    return [];
+    return {
+      resolvedDate: undefined,
+      availability: [] as PlaytomicAvailabilityResource[],
+    };
   }
 
   const availabilityUrl = new URL(`${clubKnowledge.reservations.playtomic.baseUrl}/api/clubs/availability`);
@@ -306,10 +328,24 @@ async function getPlaytomicUniqueTimes(date: string) {
   });
 
   if (!availabilityResponse.ok) {
-    return [];
+    return {
+      resolvedDate,
+      availability: [] as PlaytomicAvailabilityResource[],
+    };
   }
 
-  const availability = (await availabilityResponse.json()) as PlaytomicAvailabilityResource[];
+  return {
+    resolvedDate,
+    availability: (await availabilityResponse.json()) as PlaytomicAvailabilityResource[],
+  };
+}
+
+async function getPlaytomicUniqueTimes(date: string) {
+  const { availability, resolvedDate } = await fetchPlaytomicAvailabilityForDate(date);
+
+  if (!resolvedDate) {
+    return [];
+  }
 
   return Array.from(
     new Set(
@@ -320,6 +356,78 @@ async function getPlaytomicUniqueTimes(date: string) {
       ),
     ),
   ).sort();
+}
+
+export async function getPlaytomicDailyAvailability(options: { date: string; period?: string; limit?: number }) {
+  try {
+    const { availability, resolvedDate } = await fetchPlaytomicAvailabilityForDate(options.date);
+
+    if (!resolvedDate) {
+      return {
+        resolvedDate: undefined,
+        slots: [] as PlaytomicDailyAvailabilitySlot[],
+      };
+    }
+
+    const groupedSlots = new Map<
+      string,
+      { availableCourts: number; bestResourceId: string; bestSlot: PlaytomicAvailabilitySlot; bestStartDate: string }
+    >();
+
+    for (const resource of availability) {
+      for (const slot of resource.slots) {
+        const localTime = getLocalTimeLabelFromUtc(resource.start_date, slot.start_time, clubKnowledge.reservations.playtomic.timezone);
+
+        if (!matchesTimePeriod(localTime, options.period)) {
+          continue;
+        }
+
+        const currentEntry = groupedSlots.get(localTime);
+
+        if (!currentEntry) {
+          groupedSlots.set(localTime, {
+            availableCourts: 1,
+            bestResourceId: resource.resource_id,
+            bestSlot: slot,
+            bestStartDate: resource.start_date,
+          });
+          continue;
+        }
+
+        currentEntry.availableCourts += 1;
+
+        const preferredDuration = clubKnowledge.reservations.preferredBookingDurationMinutes;
+        const currentDistance = Math.abs(currentEntry.bestSlot.duration - preferredDuration);
+        const candidateDistance = Math.abs(slot.duration - preferredDuration);
+
+        if (candidateDistance < currentDistance || (candidateDistance === currentDistance && slot.duration > currentEntry.bestSlot.duration)) {
+          currentEntry.bestResourceId = resource.resource_id;
+          currentEntry.bestSlot = slot;
+          currentEntry.bestStartDate = resource.start_date;
+        }
+      }
+    }
+
+    const slots = Array.from(groupedSlots.entries())
+      .sort(([leftTime], [rightTime]) => (convertTimeToMinutes(leftTime) ?? 0) - (convertTimeToMinutes(rightTime) ?? 0))
+      .slice(0, options.limit ?? 12)
+      .map(([time, entry]) => ({
+        time,
+        availableCourts: entry.availableCourts,
+        duration: entry.bestSlot.duration,
+        reserveUrl: buildPlaytomicPaymentLink(entry.bestResourceId, entry.bestStartDate, entry.bestSlot),
+      }));
+
+    return {
+      resolvedDate,
+      slots,
+    };
+  } catch {
+    return {
+      resolvedDate: undefined,
+      slots: [] as PlaytomicDailyAvailabilitySlot[],
+    };
+  }
 }
 
 export async function getPlaytomicAvailableTimes(options: { date: string; period?: string; limit?: number }) {
@@ -388,23 +496,12 @@ export async function buildPlaytomicReservationLink(options: PlaytomicReservatio
   const fallbackLink = buildPlaytomicClubLink(options, resolvedDate);
 
   try {
-    const availabilityUrl = new URL(`${clubKnowledge.reservations.playtomic.baseUrl}/api/clubs/availability`);
-    availabilityUrl.searchParams.set("tenant_id", clubKnowledge.reservations.playtomic.tenantId);
-    availabilityUrl.searchParams.set("date", resolvedDate);
-    availabilityUrl.searchParams.set("sport_id", clubKnowledge.reservations.playtomic.availabilitySportId);
+    const { availability } = await fetchPlaytomicAvailabilityForDate(options.date);
 
-    const availabilityResponse = await fetch(availabilityUrl, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-
-    if (!availabilityResponse.ok) {
+    if (!availability.length) {
       return fallbackLink;
     }
 
-    const availability = (await availabilityResponse.json()) as PlaytomicAvailabilityResource[];
     const matchingResource = availability.find((resource) =>
       resource.slots.some(
         (slot) =>
@@ -437,15 +534,7 @@ export async function buildPlaytomicReservationLink(options: PlaytomicReservatio
       return fallbackLink;
     }
 
-    const paymentParams = new URLSearchParams({
-      type: "CUSTOMER_MATCH",
-      tenant_id: clubKnowledge.reservations.playtomic.tenantId,
-      resource_id: matchingResource.resource_id,
-      start: formatUtcIsoWithoutMilliseconds(new Date(`${matchingResource.start_date}T${matchingSlot.start_time}Z`)),
-      duration: String(matchingSlot.duration),
-    });
-
-    return `${clubKnowledge.reservations.playtomic.baseUrl}/api/web-app/payments?${paymentParams.toString()}`;
+    return buildPlaytomicPaymentLink(matchingResource.resource_id, matchingResource.start_date, matchingSlot);
   } catch {
     return fallbackLink;
   }

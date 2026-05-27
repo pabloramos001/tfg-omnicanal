@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CustomerChatWidget } from "./customer-chat-widget";
+import { ReservationCalendar } from "./reservation-calendar";
 
 const serviceCards = [
   {
@@ -88,6 +89,18 @@ export default function ClientePage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <Link
+                href="#booking-calendar"
+                className="inline-flex rounded-full bg-[#5d88c4] px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_12px_28px_rgba(93,136,196,0.28)] transition hover:bg-[#4d77b1]"
+              >
+                Ver calendario de reservas
+              </Link>
+              <Link
+                href="/reservas"
+                className="inline-flex rounded-full border border-stone-300 bg-white px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-stone-700 transition hover:border-[#5d88c4] hover:text-[#355986]"
+              >
+                Abrir pagina de reservas
+              </Link>
               <span className="inline-flex rounded-full bg-[#5d88c4] px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_12px_28px_rgba(93,136,196,0.28)]">
                 Chat integrado abajo a la izquierda
               </span>
@@ -140,6 +153,8 @@ export default function ClientePage() {
             </article>
           ))}
         </section>
+
+        <ReservationCalendar />
 
         <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <article className="rounded-[1.9rem] border border-stone-200 bg-white/85 p-6 shadow-[0_10px_30px_rgba(87,83,78,0.08)] sm:p-8">
